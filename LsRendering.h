@@ -1,36 +1,18 @@
 #pragma once
 
+#include <cassert>
+
 #include "HeliosDac.h"
-
-constexpr double epsi = 0.001;
-
-template<typename T>
-struct LsVec2 {
-    T x, y;
-
-    LsVec2& operator = (const LsVec2& other) = default;
-    LsVec2 operator + (const LsVec2& other) { x += other.x; y += other.y; return *this; }
-    LsVec2 operator - (const LsVec2& other) { x -= other.x; y -= other.y; return *this; }
-    LsVec2 operator * (const LsVec2& other) { x *= other.x; y *= other.y; return *this; }
-    LsVec2 operator / (const LsVec2& other) { x /= other.x; y /= other.y; return *this; }
-    LsVec2 operator += (const LsVec2& other) { x += other.x; y += other.y; return *this; }
-    LsVec2 operator -= (const LsVec2& other) { x -= other.x; y -= other.y; return *this; }
-    LsVec2 operator *= (const LsVec2& other) { x *= other.x; y *= other.y; return *this; }
-    LsVec2 operator /= (const LsVec2& other) { x /= other.x; y /= other.y; return *this; }
-};
-using LsVec2I = LsVec2<int>;
-using LsVec2U = LsVec2<unsigned>;
-using LsVec2F = LsVec2<float>;
-using LsVec2D = LsVec2<double>;
+#include "LsUtilities.h"
 
 struct LsColor {
     unsigned r = 255, g = 255, b = 255;
 };
 
 struct LsLine {
-    LsVec2D start, end;
-    [[nodiscard]] bool isPoint() const { return std::abs(end.x) - std::abs(start.x) < epsi && std::abs(end.y) - std::abs(start.y) < epsi; }
-    LsLine(const LsVec2D& start, const LsVec2D& end) : start(start), end(end) {};
+    LsVec2F start, end;
+    [[nodiscard]] bool isPoint() const { return pointsAreEqual(start, end); }
+    LsLine(const LsVec2F& start, const LsVec2F& end) : start(start), end(end) { assert(start.x >= 0.f && start.y >= 0.f && end.x >= 0.f && end.y >= 0.f); };
 };
 
 class LsGraphic {
@@ -39,13 +21,17 @@ private:
     std::vector<unsigned> colorChannelMap;
     std::vector<LsColor> colors;
 
+    LsVec2F size = {-1.f, -1.f};
+
     void ensureColorIntegrity();
+    void figureOutSize();
 public:
     std::vector<LsLine>& getLines();
     unsigned getColorCount();
     LsColor getColor(unsigned index);
+    LsVec2F getSize();
 
-    void addLine(const LsVec2D& start, const LsVec2D& end, const unsigned& colorChannel);
+    void addLine(const LsVec2F& start, const LsVec2F& end, const unsigned& colorChannel);
     void addLine(const LsLine& line, const unsigned& colorChannel);
     void setColor(const LsColor& color, const unsigned& colorChannel);
 
@@ -61,22 +47,24 @@ private:
     LsGraphic sourceGraphic{};
     LsGraphic graphic{};
 
-    LsVec2D position = {0.0, 0.0};
-    LsVec2D scale = {1.0, 1.0};
-    double rotation = 0.0;
+    LsVec2F position = {0.0, 0.0};
+    LsVec2F scale = {1.0, 1.0};
+    float rotation = 0.0;
 
-    LsVec2D sourceCenter;
-    LsVec2D computeSourceCenter();
+    LsVec2F sourceCenter;
+    LsVec2F computeSourceCenter();
     void applyTransformation();
 public:
-    void setRotation(const double& newRotation);
-    void setScale(LsVec2D newScale);
-    void setPosition(LsVec2D newPosition);
+    void setRotation(const float& newRotation);
+    void setScale(LsVec2F newScale);
+    void setPosition(LsVec2F newPosition);
     void setColor(const LsColor& color, const unsigned& colorID);
+    void setSourceGraphic(const LsGraphic& sourceGraphic);
 
-    LsVec2D getPosition();
-    LsVec2D getScale();
-    double getRotation();
+    LsVec2F getPosition();
+    LsVec2F getScale();
+    LsVec2F getSize();
+    float getRotation();
     unsigned getColorCount();
     LsColor getColor(unsigned index);
 
@@ -85,22 +73,27 @@ public:
 
     LsObject() = default;
     LsObject(const LsGraphic& lines);
-    LsObject(const LsVec2D& position, const LsVec2D& scale, const double& rotation, const LsGraphic& lines);
+    LsObject(const LsVec2F& position, const LsVec2F& scale, const float& rotation, const LsGraphic& lines);
 };
 
 class LsRenderer{
 private:
     HeliosDac dac;
     std::vector<LsGraphic> graphics;
+
+    void buildOptimalOutput();
+    std::vector<HeliosPoint> output;
     int totalLines = 0;
     int totalBlanks = 0;
+    int dev;
 public:
-    unsigned maxPPS;
-    LsVec2U canvasSize;
-    LsVec2U colorRange;
-    int deviceID = INT_MIN;
+    unsigned maxPPS = 15000;
+    LsVec2U canvasSize = {4095, 4095};
+    LsVec2U colorRange = {0, 255};
+    unsigned framerate = 60;
+    unsigned deviceID = UINT_MAX;
 
-    void add(LsObject& object);
+    void draw(LsObject& object);
     void pushFrame();
     void setDevice(int deviceID);
 

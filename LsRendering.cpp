@@ -1,5 +1,6 @@
 #include "LsRendering.h"
 
+#include <cassert>
 #include <cmath>
 #include <filesystem>
 #include <fstream>
@@ -8,6 +9,21 @@
 std::vector<LsLine>& LsGraphic::getLines() { return this->lines; }
 LsColor LsGraphic::getColor(unsigned index) { if(index >= this->colors.size()) { throw std::runtime_error("LsGraphic::getColor access out of bounds"); } return this->colors[index]; }
 unsigned LsGraphic::getColorCount() { return this->colors.size(); }
+LsVec2F LsGraphic::getSize() { figureOutSize(); return this->size; }
+
+void LsGraphic::figureOutSize() {
+    this->size = {0.f, 0.f};
+    for(const auto& line : this->lines) {
+        if(line.start.x > size.x)
+            size.x = line.start.x;
+        if(line.start.y > size.y)
+            size.y = line.start.y;
+        if(line.end.x > size.x)
+            size.x = line.end.x;
+        if(line.end.y > size.y)
+            size.y = line.end.y;
+    }
+}
 
 void LsGraphic::ensureColorIntegrity() {
     unsigned min = INT_MAX;
@@ -29,7 +45,8 @@ void LsGraphic::ensureColorIntegrity() {
     }
 }
 
-void LsGraphic::addLine(const LsVec2D& start, const LsVec2D& end, const unsigned& colorChannel) {
+void LsGraphic::addLine(const LsVec2F& start, const LsVec2F& end, const unsigned& colorChannel) {
+    assert(start.x >= 0.f && start.y >= 0.f && end.x >= 0.f && end.y >= 0.f);
     this->lines.push_back({start, end});
     this->colorChannelMap.push_back(colorChannel);
     ensureColorIntegrity();
@@ -64,7 +81,7 @@ bool LsGraphic::loadFromFile(const std::string& filePath) {
     }
 
     for(int i = 0; i < numOfLines; i++) {
-        double startX, startY, endX, endY;
+        float startX, startY, endX, endY;
         unsigned colorID;
         if(file >> startX >> startY >> endX >> endY >> colorID) {
             graphic.addLine({startX, startY}, {endX, endY}, colorID);
@@ -120,19 +137,20 @@ bool LsGraphic::saveToFile(const std::string &filePath) {
     return true;
 }
 
-LsVec2D LsObject::getPosition() { return position; }
-double LsObject::getRotation() { return rotation; }
-LsVec2D LsObject::getScale() { return scale; }
+LsVec2F LsObject::getPosition() { return position; }
+float LsObject::getRotation() { return rotation; }
+LsVec2F LsObject::getScale() { return scale; }
+LsVec2F LsObject::getSize() { return this->graphic.getSize(); }
 LsColor LsObject::getColor(unsigned index) { return this->graphic.getColor(index); }
 unsigned LsObject::getColorCount() { return this->graphic.getColorCount(); }
-LsGraphic LsObject::getGraphic() { return graphic; }
+LsGraphic LsObject::getGraphic() { applyTransformation(); return graphic; }
 LsGraphic LsObject::getSourceGraphic() { return sourceGraphic; }
 
-LsVec2D LsObject::computeSourceCenter() {
-    double left = std::numeric_limits<double>::infinity();
-    double right = -std::numeric_limits<double>::infinity();
-    double top = -std::numeric_limits<double>::infinity();
-    double bottom = std::numeric_limits<double>::infinity();
+LsVec2F LsObject::computeSourceCenter() {
+    float left = std::numeric_limits<float>::infinity();
+    float right = -std::numeric_limits<float>::infinity();
+    float top = -std::numeric_limits<float>::infinity();
+    float bottom = std::numeric_limits<float>::infinity();
 
     for (auto& line : this->sourceGraphic.getLines()) {
         left = std::min({left, line.start.x, line.end.x});
@@ -141,7 +159,7 @@ LsVec2D LsObject::computeSourceCenter() {
         top = std::max({top, line.start.y, line.end.y});
     }
 
-    LsVec2D center = { left + (right - left) / 2.0, bottom + (top - bottom) / 2.0 };
+    LsVec2F center = { left + (right - left) / 2.f, bottom + (top - bottom) / 2.f };
 
     return center;
 }
@@ -152,7 +170,7 @@ LsObject::LsObject(const LsGraphic& lines) {
     sourceCenter = this->computeSourceCenter();
 }
 
-LsObject::LsObject(const LsVec2D& position, const LsVec2D& scale, const double& rotation, const LsGraphic& lines) {
+LsObject::LsObject(const LsVec2F& position, const LsVec2F& scale, const float& rotation, const LsGraphic& lines) {
     this->position = position;
     this->scale = scale;
     this->rotation = rotation;
@@ -182,12 +200,12 @@ void LsObject::applyTransformation() {
     }
 
     //rotation
-    const double cosA = std::cos(rotation);
-    const double sinA = std::sin(rotation);
+    const float cosA = std::cos(rotation);
+    const float sinA = std::sin(rotation);
 
-    auto rotatePoint = [&](LsVec2D& p) {
-        const double dx = p.x - sourceCenter.x;
-        const double dy = p.y - sourceCenter.y;
+    auto rotatePoint = [&](LsVec2F& p) {
+        const float dx = p.x - sourceCenter.x;
+        const float dy = p.y - sourceCenter.y;
         p.x = sourceCenter.x + dx * cosA - dy * sinA;
         p.y = sourceCenter.y + dx * sinA + dy * cosA;
     };
@@ -198,15 +216,61 @@ void LsObject::applyTransformation() {
     }
 }
 
-void LsObject::setPosition(LsVec2D newPosition) { this->position = newPosition; }
-void LsObject::setScale(LsVec2D newScale) { this->scale = newScale; }
-void LsObject::setRotation(const double& newRotation) { this->rotation = newRotation; }
+void LsObject::setPosition(LsVec2F newPosition) { this->position = newPosition; }
+void LsObject::setScale(LsVec2F newScale) { this->scale = newScale; }
+void LsObject::setRotation(const float& newRotation) { this->rotation = newRotation; }
 void LsObject::setColor(const LsColor &color, const unsigned &colorID) { this->graphic.setColor(color, colorID); }
+void LsObject::setSourceGraphic(const LsGraphic &sourceGraphic) { this->sourceGraphic = sourceGraphic; this->graphic = sourceGraphic; }
 
-void LsRenderer::add(LsObject& object) {
+void LsRenderer::setDevice(int deviceID) {
+    if(dev >= deviceID+1)
+        this->deviceID = deviceID;
+    else
+        this->deviceID = UINT_MAX;
+}
+
+LsRenderer::LsRenderer(int deviceID) {
+    dev = dac.OpenDevices();
+    if(dev >= deviceID+1)
+        this->deviceID = deviceID;
+}
+
+void LsRenderer::draw(LsObject& object) {
     object.applyTransformation();
 
     graphics.emplace_back(object.getGraphic());
 }
 
+void LsRenderer::buildOptimalOutput() {
 
+}
+
+void LsRenderer::pushFrame() {
+    if(deviceID == UINT_MAX) {
+        std::cerr << "Attempted to push frame with no valid device set\n";
+        return;
+    }
+
+    //sophisticated bullshit to build the optimal points configuration
+    this->buildOptimalOutput();
+
+    auto start = std::chrono::steady_clock::now();
+    while(dac.GetStatus(deviceID) != 1) {
+        std::this_thread::sleep_for(std::chrono::microseconds(10));
+        if (std::chrono::steady_clock::now() - start >= std::chrono::seconds(1)) {
+            std::cerr << "LsRenderer::pushFrame no response from set device (" + std::to_string(deviceID) + ") within 1 second of waiting to send output\n";
+            return;
+        }
+    }
+
+    int PPS = this->framerate * static_cast<int>(output.size());
+    if(PPS > maxPPS)
+        PPS = maxPPS;
+
+    dac.WriteFrame(deviceID, PPS, 0, output.data(), output.size());
+
+    graphics.clear();
+    output.clear();
+    totalLines = 0;
+    totalBlanks = 0;
+}
