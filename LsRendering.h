@@ -17,16 +17,16 @@ struct LsLine {
 
 class LsGraphic {
 private:
+    friend class LsObject;
     std::vector<LsLine> lines;
-    std::vector<unsigned> colorChannelMap;
+    std::vector<unsigned> colorChannelMap; //index matches an index of a line. Value matches the index of a color.
     std::vector<LsColor> colors;
 
-    LsVec2F size = {-1.f, -1.f};
+    LsVec2F size = {0.f, 0.f};
 
-    void ensureColorIntegrity();
     void figureOutSize();
 public:
-    std::vector<LsLine>& getLines();
+    std::vector<LsLine> getLines();
     unsigned getColorCount();
     LsColor getColor(unsigned index);
     LsVec2F getSize();
@@ -63,7 +63,6 @@ public:
 
     LsVec2F getPosition();
     LsVec2F getScale();
-    LsVec2F getSize();
     float getRotation();
     unsigned getColorCount();
     LsColor getColor(unsigned index);
@@ -81,10 +80,13 @@ private:
     HeliosDac dac;
     std::vector<LsGraphic> graphics;
 
-    void buildOptimalOutput();
-    std::vector<HeliosPoint> output;
-    int totalLines = 0;
-    int totalBlanks = 0;
+    std::vector<HeliosPoint> buildOptimalOutput();
+    struct LaserPoint {
+        LsVec2F currentPos;
+        float angleMoving; // degrees
+    };
+    LaserPoint laserPoint;
+
     int dev;
 public:
     unsigned maxPPS = 15000;
@@ -96,6 +98,9 @@ public:
     void draw(LsObject& object);
     void pushFrame();
     void setDevice(int deviceID);
+    void DEBUG_optimal_output() {
+        buildOptimalOutput();
+    }
 
     LsRenderer() = default;
     LsRenderer(int deviceID);
