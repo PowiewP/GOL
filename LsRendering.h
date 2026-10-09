@@ -1,44 +1,70 @@
 #pragma once
 
-#include <cassert>
-
 #include "HeliosDac.h"
 #include "LsUtilities.h"
 
 struct LsColor {
-    unsigned r = 255, g = 255, b = 255;
+    unsigned r = 255, g = 255, b = 255, a = 255;
 };
 
 struct LsLine {
     LsVec2F start, end;
     [[nodiscard]] bool isPoint() const { return pointsAreEqual(start, end); }
-    LsLine(const LsVec2F& start, const LsVec2F& end) : start(start), end(end) { assert(start.x >= 0.f && start.y >= 0.f && end.x >= 0.f && end.y >= 0.f); };
+    LsLine(const LsVec2F& start, const LsVec2F& end) : start(start), end(end) {};
+    LsLine() = default;
 };
 
+/// The fundamental class for storing pictures to use in LsObjects.
+///
+/// An LsGraphic contains an array of lines and an array of color channels. Each line maps to a single color channel and derives its color value from it. Its contents can be saved and loaded using ILDA files.
 class LsGraphic {
 private:
     friend class LsObject;
     std::vector<LsLine> lines;
-    std::vector<unsigned> colorChannelMap; //index matches an index of a line. Value matches the index of a color.
+    std::vector<unsigned> colorChannelMap; //index matches an index of a line. Value matches the index of a color channel.
     std::vector<LsColor> colors;
 
-    LsVec2F size = {0.f, 0.f};
-
-    void figureOutSize();
+    LsVec2F figureOutSize() const;
 public:
-    std::vector<LsLine> getLines();
-    unsigned getColorCount();
-    LsColor getColor(unsigned index);
-    LsVec2F getSize();
+    /// @return A copy of the lines inside this graphic
+    std::vector<LsLine> getLines() const;
 
+    /// @return The amount of color channels this graphic contains
+    unsigned getColorCount() const;
+
+    /// @return The color stored inside a specific color channel within this graphic
+    /// @param channelIndex Index of a color channel
+    LsColor getColor(unsigned channelIndex) const;
+
+    /// @return Index of a color channel where the specific line derives a color from
+    /// @param lineIndex Index of a line within this graphic
+    unsigned getColorChannel(unsigned lineIndex) const;
+
+    /// @return The rectangular size of this graphic
+    LsVec2F getSize() const;
+
+    /// Adds a line to this graphic
+    /// @param colorChannel The index of a color channel within this graphic. If the channel doesn't exist, new ones are created until reaching the requested index, with the default value of white.
     void addLine(const LsVec2F& start, const LsVec2F& end, const unsigned& colorChannel);
+
+    /// Adds a line to this graphic
+    /// @param colorChannel The index of a color channel within this graphic. If the channel doesn't exist, new ones are created until reaching the requested index, with the default value of white.
     void addLine(const LsLine& line, const unsigned& colorChannel);
+
+    /// Modifies the color value of a specific color channel within this graphic
+    /// @param colorChannel The index of a color channel within this graphic. If the channel doesn't exist, new ones are created until reaching the requested index.
+    /// The specified channel is created with the color value that was passed, the ones in between will have the default color of white.
     void setColor(const LsColor& color, const unsigned& colorChannel);
 
+    /// Loads the graphic from an ILDA file (.ILD)
+    /// @return True on success, False on failure.
     bool loadFromFile(const std::string& filePath);
-    bool saveToFile(const std::string& filePath);
+
+    /// Saves the graphic into an ILDA file (.ILD)
+    /// @return True on success, False on failure.
+    bool saveToFile(const std::string& filePath) const;
+
     LsGraphic() = default;
-    LsGraphic(const std::string& filePath) { loadFromFile(filePath); };
 };
 
 class LsObject {
@@ -80,24 +106,33 @@ private:
     HeliosDac dac;
     std::vector<LsGraphic> graphics;
 
+    HeliosPoint makeHeliosPoint(LsVec2F pos, LsColor color);
     std::vector<HeliosPoint> buildOptimalOutput();
     struct LaserPoint {
         LsVec2F currentPos;
         float angleMoving; // degrees
     };
-    LaserPoint laserPoint;
+    LaserPoint laserPoint = {{0, 0}, 0};
 
-    int dev;
-public:
-    unsigned maxPPS = 15000;
     LsVec2U canvasSize = {4095, 4095};
     LsVec2U colorRange = {0, 255};
+
+    int validDevicesAmount;
+    unsigned maxPPS = 15000;
     unsigned framerate = 60;
     unsigned deviceID = UINT_MAX;
+public:
+    bool setDevice(int deviceID);
+    void setFramerate(unsigned framerate);
+    void setMaxPPS(unsigned maxPPS);
+
+    int getDeviceID();
+    bool deviceIsValid();
+    unsigned getMaxPPS();
+    unsigned getFramerate();
 
     void draw(LsObject& object);
     void pushFrame();
-    void setDevice(int deviceID);
     void DEBUG_optimal_output() {
         buildOptimalOutput();
     }

@@ -7,15 +7,17 @@
 #include <iostream>
 #include <unordered_set>
 
-std::vector<LsLine> LsGraphic::getLines() { return this->lines; }
-LsColor LsGraphic::getColor(unsigned index) { if(index >= this->colors.size()) { throw std::runtime_error("LsGraphic::getColor access out of bounds"); } return this->colors[index]; }
-unsigned LsGraphic::getColorCount() { return this->colors.size(); }
-LsVec2F LsGraphic::getSize() { figureOutSize(); return this->size; }
+std::vector<LsLine> LsGraphic::getLines() const { return this->lines; }
+LsColor LsGraphic::getColor(unsigned channelIndex) const { if(channelIndex >= this->colors.size()) { throw std::runtime_error("LsGraphic::getColor access out of bounds"); } return this->colors[channelIndex]; }
+unsigned LsGraphic::getColorChannel(unsigned lineIndex) const { return this->colorChannelMap[lineIndex]; }
+unsigned LsGraphic::getColorCount() const { return this->colors.size(); }
+LsVec2F LsGraphic::getSize() const { return figureOutSize(); }
 
-void LsGraphic::figureOutSize() {
+LsVec2F LsGraphic::figureOutSize() const {
+    LsVec2F size = {0.f, 0.f};
+
     if(lines.empty()) {
-        size = {0.f, 0.f};
-        return;
+        return size;
     }
 
     constexpr float inf = std::numeric_limits<float>::infinity();
@@ -30,6 +32,8 @@ void LsGraphic::figureOutSize() {
     }
 
     size = {hi.x - lo.x, hi.y - lo.y};
+
+    return size;
 }
 
 void LsGraphic::addLine(const LsVec2F& start, const LsVec2F& end, const unsigned& colorChannel) {
@@ -55,78 +59,7 @@ void LsGraphic::setColor(const LsColor &color, const unsigned& colorChannel) {
     this->colors[colorChannel] = color;
 }
 
-bool LsGraphic::loadFromFile(const std::string& filePath) {
-    std::ifstream file(filePath);
-    if(!file.is_open()) {
-        std::cerr << "Error opening LsGraphic source file: " << filePath << " - Failed to open\n";
-        return false;
-    }
-
-    LsGraphic graphic;
-
-    int numOfLines;
-    if(!(file >> numOfLines)) {
-        std::cerr << "Error reading LsGraphic source file: " << filePath << " - The file is likely corrupted\n";
-        return false;
-    }
-
-    for(int i = 0; i < numOfLines; i++) {
-        float startX, startY, endX, endY;
-        unsigned colorID;
-        if(file >> startX >> startY >> endX >> endY >> colorID) {
-            graphic.addLine({startX, startY}, {endX, endY}, colorID);
-        }
-        else {
-            std::cerr << "Error reading LsGraphic source file: " << filePath << " - The file is likely corrupted\n";
-            return false;
-        }
-    }
-
-    int numOfColors;
-    if(!(file >> numOfColors)) {
-        std::cerr << "Error reading LsGraphic source file: " << filePath << " - The file is likely corrupted\n";
-        return false;
-    }
-
-    for(int i = 0; i < numOfColors; i++) {
-        unsigned r, g, b;
-        if(file >> r >> g >> b) {
-            if(i > graphic.getColorCount()) {
-                std::cerr << "Error reading LsGraphic source file: " << filePath << " - The file is likely corrupted\n";
-                return false;
-            }
-            this->setColor({r, g, b}, i);
-        }
-        else {
-            std::cerr << "Error reading LsGraphic source file: " << filePath << " - The file is likely corrupted\n";
-            return false;
-        }
-    }
-
-    *this = graphic;
-    return true;
-}
-
-bool LsGraphic::saveToFile(const std::string &filePath) {
-    std::ofstream file(filePath+".GOLG");
-    if(!file.is_open()) {
-        std::cerr << "Couldn't create file " << filePath << " - The location is likely read-only or the program has no access priveleges for it\n";
-        return false;
-    }
-
-    file << this->lines.size() << "\n\n";
-    for(int i = 0; i < this->lines.size(); i++) {
-        auto& line = this->lines[i];
-        file << line.start.x << " " << line.start.y << " " << line.end.x << " " << line.end.y << " " << this->colorChannelMap[i] << "\n";
-    }
-
-    file << "\n" << this->getColorCount() << "\n\n";
-    for(const auto& color : this->colors) {
-        file << color.r << " " << color.g << " " << color.b << "\n";
-    }
-
-    return true;
-}
+//save and load are implemented in ILDAFormat.h
 
 LsVec2F LsObject::getPosition() { return position; }
 float LsObject::getRotation() { return rotation; }
@@ -214,68 +147,13 @@ void LsObject::setRotation(const float& newRotation) { this->rotation = newRotat
 void LsObject::setColor(const LsColor& color, const unsigned& colorID) { this->graphic.setColor(color, colorID); }
 void LsObject::setSourceGraphic(const LsGraphic& sourceGraphic) { this->sourceGraphic = sourceGraphic; this->graphic = sourceGraphic; this->sourceCenter = computeSourceCenter(); }
 
-void LsRenderer::setDevice(int deviceID) {
-    if(dev >= deviceID+1)
-        this->deviceID = deviceID;
-    else
-        this->deviceID = UINT_MAX;
-}
-
-LsRenderer::LsRenderer(int deviceID) {
-    dev = dac.OpenDevices();
-    if(dev >= deviceID+1)
-        this->deviceID = deviceID;
-}
-
 void LsRenderer::draw(LsObject& object) {
     //object.applyTransformation(); not needed, getGraphic() already calls this by itself
 
     graphics.emplace_back(object.getGraphic());
 }
 
-std::vector<HeliosPoint> LsRenderer::buildOptimalOutput() {
-    struct ConnectedComponent {
-        std::vector<LsLine> lines;
-        std::vector<LsColor> linesColors;
-        std::vector<LsVec2F> edges;
-    };
-
-    std::vector<ConnectedComponent> connectedComponents;
-    std::vector<HeliosPoint> output;
-
-    // Step 1: create Connected Components
-    for(auto& graphic : this->graphics) {
-        auto lines = graphic.getLines();
-
-        while(lines.empty()) {
-            ConnectedComponent newCC;
-
-            //start from line 0, travel until reaching one end of the connected component
-            bool keepsGoing = true;
-            while(keepsGoing) {
-                for(int i = 0; i < lines.size()-1; i++) {
-                    if(!pointsAreEqual(lines[i].end, lines[i+1].start) && !pointsAreEqual(lines[i].start, lines[i+1].end) || i == lines.size()-2) {
-                        keepsGoing = false;
-                        break;
-                    }
-                }
-            }
-        }
-
-        for(auto& comp : connectedComponents) {
-            std::cout << "Edges: \n\n";
-            for(auto& edge : comp.edges) {
-                std::cout << edge << ", \n";
-            }
-            std::cout << "\nLines";
-            for(auto& line : comp.lines) {
-                std::cout << line.start << " - " << line.end << "\n";
-            }
-        }
-    }
-
-    return output;
-}
+//LsRenderer::buildOptimalOutput() implemented in isolated header-only implementation
 
 void LsRenderer::pushFrame() {
     if(deviceID == UINT_MAX) {
@@ -295,7 +173,7 @@ void LsRenderer::pushFrame() {
         }
     }
 
-    int PPS = this->framerate * static_cast<int>(output.size());
+    unsigned PPS = this->framerate * static_cast<unsigned>(output.size());
     if(PPS > maxPPS)
         PPS = maxPPS;
 
@@ -303,3 +181,27 @@ void LsRenderer::pushFrame() {
 
     graphics.clear();
 }
+
+bool LsRenderer::deviceIsValid() { return deviceID == UINT_MAX; }
+int LsRenderer::getDeviceID() { return this->deviceID; }
+unsigned LsRenderer::getFramerate() { return this->framerate; }
+unsigned LsRenderer::getMaxPPS() { return this->maxPPS; }
+void LsRenderer::setFramerate(unsigned framerate) { this->framerate = framerate; }
+void LsRenderer::setMaxPPS(unsigned maxPPS) { this->maxPPS = maxPPS; if (maxPPS > 30000)
+    std::cout << "Warning: set maxPPS to above 30k, it's very rare for lasers to go this high, and requesting pointrates above the laser's limit can damage the hardware"; }
+
+bool LsRenderer::setDevice(int deviceID) {
+    if(validDevicesAmount >= deviceID+1)
+        this->deviceID = deviceID;
+    else
+        this->deviceID = UINT_MAX;
+    return this->deviceIsValid();
+}
+
+LsRenderer::LsRenderer(int deviceID) {
+    validDevicesAmount = dac.OpenDevices();
+    if(validDevicesAmount >= deviceID+1)
+        this->deviceID = deviceID;
+}
+
+
