@@ -198,10 +198,4 @@ bool LsRenderer::setDevice(int deviceID) {
     return this->deviceIsValid();
 }
 
-LsRenderer::LsRenderer(int deviceID) {
-    validDevicesAmount = dac.OpenDevices();
-    if(validDevicesAmount >= deviceID+1)
-        this->deviceID = deviceID;
-}
-
 

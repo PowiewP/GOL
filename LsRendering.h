@@ -6,6 +6,21 @@
 struct LsColor {
     unsigned r = 255, g = 255, b = 255, a = 255;
 };
+constexpr LsColor BLANK = {0, 0, 0, 0};
+constexpr LsColor WHITE = {255, 255, 255};
+
+constexpr LsColor RED = {255, 0, 0};
+constexpr LsColor BLUE = {0, 0, 255};
+constexpr LsColor GREEN = {0, 255, 0};
+
+constexpr LsColor YELLOW = {255, 255, 0};
+constexpr LsColor PINK = {255, 0, 255};
+constexpr LsColor CYAN = {0, 255, 255};
+
+constexpr LsColor ORANGE = {255, 128, 0};
+constexpr LsColor PURPLE = {128, 0, 255};
+
+
 
 struct LsLine {
     LsVec2F start, end;
@@ -138,7 +153,6 @@ public:
     }
 
     LsRenderer() = default;
-    LsRenderer(int deviceID);
 };
 
 

@@ -27,7 +27,7 @@ std::vector<HeliosPoint> LsRenderer::buildOptimalOutput() {
     for(auto& graphic : this->graphics) {
         auto glines = graphic.getLines();
 
-        for(int i = 0; i < glines.size(); i++) {
+        for(int i = 0; i < glines.size(); ++i) {
             auto& line = glines[i];
 
             if ((line.start.x < 0.f && line.end.x < 0.f) || (line.start.x > canvasSizeF.x && line.end.x > canvasSizeF.x)) continue;
@@ -45,7 +45,7 @@ std::vector<HeliosPoint> LsRenderer::buildOptimalOutput() {
 
     float totalDistance = distance(this->laserPoint.currentPos, lines.front().start); //first distance
 
-    for(int i = 0; i < lines.size()-1; i++) {
+    for(int i = 0; i < lines.size()-1; ++i) {
         totalDistance += distance(lines[i].start, lines[i].end);
         totalDistance += distance(lines[i].end, lines[i+1].start);
     }
@@ -54,6 +54,23 @@ std::vector<HeliosPoint> LsRenderer::buildOptimalOutput() {
     float distancePerPoint = totalDistance / static_cast<float>(this->maxPPS);
 
     // generate output
+    output.emplace_back(makeHeliosPoint(laserPoint.currentPos, BLANK));
+    output.emplace_back(makeHeliosPoint(lines[0].start, BLANK));
+
+    for(int i = 0; i < lines.size(); ++i) {
+        auto& line = lines[i];
+
+        LsVec2F lineVec = line.end - line.start;
+        float lineDist = distance(line.end, line.start); //FINISH THIS STUFF
+
+        float pointsInThisLine = std::floor(lineDist / distancePerPoint);
+
+        LsVec2F vecPerPoint = lineVec / (pointsInThisLine-1.f);
+
+        for(int p = 0; p < static_cast<int>(pointsInThisLine); ++p) {
+            output.emplace_back(makeHeliosPoint(line.start + (vecPerPoint * static_cast<float>(p)), colors[i]));
+        }
+    }
 
     return output;
 }
