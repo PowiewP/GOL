@@ -20,4 +20,8 @@ float angleTo(const LsVec2F& observer, const LsVec2F& target) {
            * (180.0f / static_cast<float>(M_PI));
 }
 
-
+void LsTimer::restart() { this->startPoint = std::chrono::steady_clock::now(); }
+LsTimer::LsTimer() { this->restart(); }
+float LsTimer::getTimeAsMicroseconds() { return std::chrono::duration<float, std::micro>(std::chrono::steady_clock::now() - startPoint).count(); }
+float LsTimer::getTimeAsMilliseconds() { return std::chrono::duration<float, std::milli>(std::chrono::steady_clock::now() - startPoint).count(); }
+float LsTimer::getTimeAsSeconds() { return std::chrono::duration<float>(std::chrono::steady_clock::now() - startPoint).count(); }

@@ -22,7 +22,7 @@ LsVec2F LsGraphic::figureOutSize() const {
 
     constexpr float inf = std::numeric_limits<float>::infinity();
 
-    LsVec2F lo = {inf, inf}, hi = {-inf, -inf};
+    LsVec2F lo = {0, 0}, hi = {0, 0};
 
     for(const auto& l : lines) {
         lo.x = std::min({lo.x, l.start.x, l.end.x});
@@ -59,15 +59,25 @@ void LsGraphic::setColor(const LsColor &color, const unsigned& colorChannel) {
     this->colors[colorChannel] = color;
 }
 
-//save and load are implemented in ILDAFormat.h
+void LsGraphic::logContents() {
+    std::cout << "| LsGraphic contents |\n\n";
+    std::cout << this->lines.size() << " lines: \n\n";
+    for(int i = 0; i < this->lines.size(); ++i) {
+        std::cout << "Line " << i << " | CC " << this->colorChannelMap[i] << " | " << lines[i].start << " -> " << lines[i].end << "\n";
+    }
+    std::cout << "\n" << this->colors.size() << " color channels: \n\n";
+    for(int i = 0; i < this->colors.size(); ++i) {
+        std::cout << "Color Channel " << i << " : " << this->colors[i] << "\n";
+    }
+}
+
+//save and load are implemented in ILDAFormat.cpp
 
 LsVec2F LsObject::getPosition() { return position; }
 float LsObject::getRotation() { return rotation; }
 LsVec2F LsObject::getScale() { return scale; }
-LsColor LsObject::getColor(unsigned index) { return this->graphic.getColor(index); }
-unsigned LsObject::getColorCount() { return this->graphic.getColorCount(); }
-LsGraphic LsObject::getGraphic() { applyTransformation(); return graphic; }
-LsGraphic LsObject::getSourceGraphic() { return sourceGraphic; }
+LsGraphic LsObject::getTransformedGraphic() { applyTransformation(); return graphic; }
+LsGraphic& LsObject::getSourceGraphic() { return sourceGraphic; }
 
 LsVec2F LsObject::computeSourceCenter() {
     float left = std::numeric_limits<float>::infinity();
@@ -144,16 +154,13 @@ void LsObject::applyTransformation() {
 void LsObject::setPosition(LsVec2F newPosition) { this->position = newPosition; }
 void LsObject::setScale(LsVec2F newScale) { this->scale = newScale; }
 void LsObject::setRotation(const float& newRotation) { this->rotation = newRotation; }
-void LsObject::setColor(const LsColor& color, const unsigned& colorID) { this->graphic.setColor(color, colorID); }
 void LsObject::setSourceGraphic(const LsGraphic& sourceGraphic) { this->sourceGraphic = sourceGraphic; this->graphic = sourceGraphic; this->sourceCenter = computeSourceCenter(); }
 
 void LsRenderer::draw(LsObject& object) {
-    //object.applyTransformation(); not needed, getGraphic() already calls this by itself
-
-    graphics.emplace_back(object.getGraphic());
+    graphics.emplace_back(object.getTransformedGraphic());
 }
 
-//LsRenderer::buildOptimalOutput() implemented in isolated header-only implementation
+//LsRenderer::buildOptimalOutput() implemented in isolated implementation because of complexicity
 
 void LsRenderer::pushFrame() {
     if(deviceID == UINT_MAX) {
@@ -182,7 +189,7 @@ void LsRenderer::pushFrame() {
     graphics.clear();
 }
 
-bool LsRenderer::deviceIsValid() { return deviceID == UINT_MAX; }
+bool LsRenderer::deviceIsValid() { return deviceID != UINT_MAX; }
 int LsRenderer::getDeviceID() { return this->deviceID; }
 unsigned LsRenderer::getFramerate() { return this->framerate; }
 unsigned LsRenderer::getMaxPPS() { return this->maxPPS; }
@@ -196,6 +203,10 @@ bool LsRenderer::setDevice(int deviceID) {
     else
         this->deviceID = UINT_MAX;
     return this->deviceIsValid();
+}
+
+LsRenderer::LsRenderer() {
+    validDevicesAmount = dac.OpenDevices();
 }
 
 

@@ -1,6 +1,8 @@
 #pragma once
+#include <chrono>
 #include <iosfwd>
 #include <cmath>
+#include <ostream>
 
 constexpr double LsEpsilon = 0.001;
 
@@ -41,12 +43,31 @@ struct LsVec2 {
     friend bool operator != (const LsVec2& a, const LsVec2& b) { return !(a == b); }
 };
 template<typename T>
-std::ostream& operator << (std::ostream& os, const LsVec2<T>& v) { return os << v.x << " " << v.y; };
+std::ostream& operator << (std::ostream& os, const LsVec2<T>& v) { return os << v.x << ", " << v.y; };
 
 using LsVec2I = LsVec2<int>;
 using LsVec2U = LsVec2<unsigned>;
 using LsVec2F = LsVec2<float>;
 using LsVec2D = LsVec2<double>;
+
+struct LsColor {
+    unsigned r = 255, g = 255, b = 255, a = 255;
+};
+inline std::ostream& operator << (std::ostream& os, const LsColor& v) { return os << v.r << ", " << v.g << ", " << v.b << "; " << v.a;  }
+
+constexpr LsColor BLANK = {0, 0, 0, 0};
+constexpr LsColor WHITE = {255, 255, 255};
+
+constexpr LsColor RED = {255, 0, 0};
+constexpr LsColor BLUE = {0, 0, 255};
+constexpr LsColor GREEN = {0, 255, 0};
+
+constexpr LsColor YELLOW = {255, 255, 0};
+constexpr LsColor PINK = {255, 0, 255};
+constexpr LsColor CYAN = {0, 255, 255};
+
+constexpr LsColor ORANGE = {255, 128, 0};
+constexpr LsColor PURPLE = {128, 0, 255};
 
 template<typename T>
 bool pointsAreEqual(const LsVec2<T>& a, const LsVec2<T>& b) {
@@ -56,4 +77,16 @@ float distance(const LsVec2F& a, const LsVec2F& b);
 double distance(const LsVec2D& a, const LsVec2D& b);
 float angleTo(const LsVec2F& observer, const LsVec2F& target);
 double angleTo(const LsVec2D& observer, const LsVec2D& target);
+
+class LsTimer {
+private:
+    std::chrono::time_point<std::chrono::steady_clock> startPoint;
+public:
+    void restart();
+    float getTimeAsSeconds();
+    float getTimeAsMilliseconds();
+    float getTimeAsMicroseconds();
+
+    LsTimer();
+};
 

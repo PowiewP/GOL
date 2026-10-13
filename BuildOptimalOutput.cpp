@@ -1,5 +1,6 @@
 #include "LsRendering.h"
 #include "LsUtilities.h"
+#include <iostream>
 
 HeliosPoint LsRenderer::makeHeliosPoint(LsVec2F pos, LsColor color) {
     HeliosPoint p;
@@ -7,7 +8,7 @@ HeliosPoint LsRenderer::makeHeliosPoint(LsVec2F pos, LsColor color) {
     p.x = static_cast<uint16_t>(std::clamp(std::round(pos.x), 0.f, static_cast<float>(this->canvasSize.x)));
     p.y = static_cast<uint16_t>(std::clamp(std::round(pos.y), 0.f, static_cast<float>(this->canvasSize.y)));
 
-    unsigned cmax =  UINT8_MAX;
+    constexpr unsigned cmax =  UINT8_MAX;
     p.r = static_cast<uint8_t>(std::min(color.r, cmax));
     p.g = static_cast<uint8_t>(std::min(color.g, cmax));
     p.b = static_cast<uint8_t>(std::min(color.b, cmax));
@@ -43,13 +44,21 @@ std::vector<HeliosPoint> LsRenderer::buildOptimalOutput() {
         }
     }
 
+    // generate blank lines in between line gaps
+    for(int i = 0; i < lines.size()-1; ++i) {
+        std::cout << "I am generating\n";
+        if(!pointsAreEqual(lines[i].end, lines[i+1].start)) {
+            LsLine blankLine = {lines[i].end, lines[i+1].start};
+            lines.insert(lines.begin()+i+1, blankLine);
+            colors.insert(colors.begin()+i+1, BLANK);
+        }
+    }
+
     float totalDistance = distance(this->laserPoint.currentPos, lines.front().start); //first distance
 
-    for(int i = 0; i < lines.size()-1; ++i) {
+    for(int i = 0; i < lines.size(); ++i) {
         totalDistance += distance(lines[i].start, lines[i].end);
-        totalDistance += distance(lines[i].end, lines[i+1].start);
     }
-    totalDistance += distance(lines.back().start, lines.back().end); //last iter
 
     float distancePerPoint = totalDistance / static_cast<float>(this->maxPPS);
 
@@ -61,7 +70,7 @@ std::vector<HeliosPoint> LsRenderer::buildOptimalOutput() {
         auto& line = lines[i];
 
         LsVec2F lineVec = line.end - line.start;
-        float lineDist = distance(line.end, line.start); //FINISH THIS STUFF
+        float lineDist = distance(line.end, line.start);
 
         float pointsInThisLine = std::floor(lineDist / distancePerPoint);
 

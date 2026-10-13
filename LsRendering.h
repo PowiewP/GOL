@@ -3,29 +3,11 @@
 #include "HeliosDac.h"
 #include "LsUtilities.h"
 
-struct LsColor {
-    unsigned r = 255, g = 255, b = 255, a = 255;
-};
-constexpr LsColor BLANK = {0, 0, 0, 0};
-constexpr LsColor WHITE = {255, 255, 255};
-
-constexpr LsColor RED = {255, 0, 0};
-constexpr LsColor BLUE = {0, 0, 255};
-constexpr LsColor GREEN = {0, 255, 0};
-
-constexpr LsColor YELLOW = {255, 255, 0};
-constexpr LsColor PINK = {255, 0, 255};
-constexpr LsColor CYAN = {0, 255, 255};
-
-constexpr LsColor ORANGE = {255, 128, 0};
-constexpr LsColor PURPLE = {128, 0, 255};
-
-
-
 struct LsLine {
     LsVec2F start, end;
     [[nodiscard]] bool isPoint() const { return pointsAreEqual(start, end); }
     LsLine(const LsVec2F& start, const LsVec2F& end) : start(start), end(end) {};
+    LsLine(const LsVec2F& point) : start(point), end(point) {};
     LsLine() = default;
 };
 
@@ -79,6 +61,8 @@ public:
     /// @return True on success, False on failure.
     bool saveToFile(const std::string& filePath) const;
 
+    void logContents();
+
     LsGraphic() = default;
 };
 
@@ -88,9 +72,9 @@ private:
     LsGraphic sourceGraphic{};
     LsGraphic graphic{};
 
-    LsVec2F position = {0.0, 0.0};
-    LsVec2F scale = {1.0, 1.0};
-    float rotation = 0.0;
+    LsVec2F position = {0.f, 0.f};
+    LsVec2F scale = {1.f, 1.f};
+    float rotation = 0.f;
 
     LsVec2F sourceCenter;
     LsVec2F computeSourceCenter();
@@ -99,17 +83,14 @@ public:
     void setRotation(const float& newRotation);
     void setScale(LsVec2F newScale);
     void setPosition(LsVec2F newPosition);
-    void setColor(const LsColor& color, const unsigned& colorID);
     void setSourceGraphic(const LsGraphic& sourceGraphic);
 
     LsVec2F getPosition();
     LsVec2F getScale();
     float getRotation();
-    unsigned getColorCount();
-    LsColor getColor(unsigned index);
 
-    LsGraphic getGraphic();
-    LsGraphic getSourceGraphic();
+    LsGraphic getTransformedGraphic();
+    LsGraphic& getSourceGraphic();
 
     LsObject() = default;
     LsObject(const LsGraphic& lines);
@@ -152,7 +133,7 @@ public:
         buildOptimalOutput();
     }
 
-    LsRenderer() = default;
+    LsRenderer();
 };
 
 
